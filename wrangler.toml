@@ -5,4 +5,4 @@ compatibility_date = "2026-08-31"
 [[d1_databases]]
 binding = "DB"
 database_name = "milky-way-ai-db"
-database_id = "PASTE_YOUR_D1_DATABASE_ID_HERE"
+database_id = "56883a72-38f9-4d73-a9da-dff165e3ff8f"
