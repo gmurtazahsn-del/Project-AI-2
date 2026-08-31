@@ -1,0 +1,8 @@
+name = "milky-way-ai"
+main = "worker.js"
+compatibility_date = "2026-08-31"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "milky-way-ai-db"
+database_id = "PASTE_YOUR_D1_DATABASE_ID_HERE"
