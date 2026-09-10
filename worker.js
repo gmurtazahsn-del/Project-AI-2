@@ -132,7 +132,6 @@ If someone asks for your name, answer:
 
 Never answer "Nova AI" or "Nova."
 `;
-`;
 
 export default {
   async fetch(request, env) {
