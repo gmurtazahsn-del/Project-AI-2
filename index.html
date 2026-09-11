@@ -593,73 +593,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 }
 .code-wrap pre{
   margin:0;
-  padding:16px;
+  padding:15px;
   overflow:auto;
-  max-width:100%;
-  white-space:pre;
-  tab-size:2;
-  -webkit-overflow-scrolling:touch;
-  font:13px/1.65 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    "Liberation Mono",
-    monospace;
-  color:#e7ecf7;
-}
-
-.code-wrap pre code{
-  display:block;
-  min-width:max-content;
-  padding:0;
-  background:transparent;
-  border:0;
-  font:inherit;
-  color:inherit;
-  white-space:inherit;
-}
-
-.code-language{
-  text-transform:lowercase;
-  font-weight:600;
-  letter-spacing:.03em;
-}
-
-.code-copy{
-  padding:5px 8px;
-  border-radius:7px;
-  color:#9da7bb;
-  background:rgba(255,255,255,.05);
-  cursor:pointer;
-  transition:.15s;
-}
-
-.code-copy:hover{
-  color:white;
-  background:rgba(255,255,255,.1);
-}
-
-.code-wrap{
-  width:100%;
-  max-width:100%;
-  margin:16px 0;
-  overflow:hidden;
-  border:1px solid rgba(255,255,255,.09);
-  border-radius:14px;
-  background:#060810;
-}
-
-.code-head{
-  min-height:36px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  padding:0 10px 0 13px;
-  color:#778197;
-  font-size:10px;
-  border-bottom:1px solid rgba(255,255,255,.06);
+  font:12px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;
+  color:#dfe6f5;
 }
 
 .msg-actions{
@@ -1279,7 +1216,7 @@ body.reduce-motion *::after{
    CONFIG
 ========================================================= */
 
-const WORKER_URL = "https://project-ai-2.g-murtazahsn.workers.dev/";
+const WORKER_URL = "https://nova-ai.g-murtazahsn.workers.dev";
 const API_BASE = WORKER_URL.replace(/\/+$/, "");
 
 const CHAT_STORAGE_KEY = "milky_way_ai_chats_v2";
@@ -1670,203 +1607,79 @@ function createMessageElement(message,index){
       regenerate(index);
     });
 
-wrapper.querySelectorAll(".code-copy").forEach(btn => {
-  btn.addEventListener("click", async () => {
-    const code = btn
-      .closest(".code-wrap")
-      ?.querySelector("pre code")
-      ?.textContent || "";
-
-    try {
-      await navigator.clipboard.writeText(code);
-
-      const oldText = btn.textContent;
-      btn.textContent = "Copied!";
-
-      setTimeout(() => {
-        btn.textContent = oldText;
-      }, 1200);
-    } catch {
-      toast("Couldn't copy code");
-    }
+  wrapper.querySelectorAll(".code-copy").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      navigator.clipboard?.writeText(btn.dataset.code || "");
+      toast("Code copied");
+    });
   });
-});
+
+  return wrapper;
+}
 
 /* =========================================================
    SAFE MARKDOWN
 ========================================================= */
 
-function renderMarkdown(text = "") {
-  if (!text) return "";
-
-  // Normalize line endings
-  text = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+function renderMarkdown(text=""){
+  let safe = escapeHTML(text);
 
   const codeBlocks = [];
 
-  /*
-   * Extract fenced code blocks FIRST.
-   * Supports:
-   * ```js
-   * code
-   * ```
-   *
-   * Also supports:
-   * ```
-   * code
-   * ```
-   */
-  text = text.replace(
-    /```([a-zA-Z0-9_+#.-]*)[ \t]*\n?([\s\S]*?)```/g,
-    (_, language, code) => {
+  safe = safe.replace(
+    /```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g,
+    (_,lang,code)=>{
       const id = codeBlocks.length;
 
-      // Remove one unnecessary newline at the beginning
-      // while preserving the user's indentation.
-      code = code.replace(/^\n/, "");
-
-      // Remove only trailing blank lines
-      code = code.replace(/\n+$/, "");
-
       codeBlocks.push({
-        language: language || "code",
+        lang:lang || "code",
         code
       });
 
-      return `\n@@CODE_BLOCK_${id}@@\n`;
+      return `@@CODE${id}@@`;
     }
   );
 
-  /*
-   * Escape everything that is NOT code.
-   */
-  let safe = escapeHTML(text);
+  safe = safe.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>");
+  safe = safe.replace(/\*(.+?)\*/g,"<em>$1</em>");
+  safe = safe.replace(/`([^`\n]+)`/g,"<code>$1</code>");
 
-  /*
-   * Headings
-   */
-  safe = safe.replace(/^### (.+)$/gm, "<h3>$1</h3>");
-  safe = safe.replace(/^## (.+)$/gm, "<h2>$1</h2>");
-  safe = safe.replace(/^# (.+)$/gm, "<h1>$1</h1>");
+  safe = safe.replace(/^### (.+)$/gm,"<h3>$1</h3>");
+  safe = safe.replace(/^## (.+)$/gm,"<h2>$1</h2>");
+  safe = safe.replace(/^# (.+)$/gm,"<h1>$1</h1>");
 
-  /*
-   * Bold
-   */
   safe = safe.replace(
-    /\*\*(.+?)\*\*/g,
-    "<strong>$1</strong>"
-  );
-
-  /*
-   * Italic
-   */
-  safe = safe.replace(
-    /(?<!\*)\*([^*\n]+)\*(?!\*)/g,
-    "<em>$1</em>"
-  );
-
-  /*
-   * Inline code
-   */
-  safe = safe.replace(
-    /`([^`\n]+)`/g,
-    "<code>$1</code>"
-  );
-
-  /*
-   * Unordered lists
-   */
-  safe = safe.replace(
-    /(^|\n)((?:[ \t]*[-*+] .+(?:\n|$))+)/g,
-    (_, prefix, block) => {
-      const items = block
-        .trim()
-        .split("\n")
-        .map(line => line.replace(/^[ \t]*[-*+] /, "").trim())
-        .filter(Boolean);
-
-      if (!items.length) return prefix;
-
-      return (
-        prefix +
-        "<ul>" +
-        items.map(item => `<li>${item}</li>`).join("") +
-        "</ul>"
-      );
+    /(?:^|\n)([-*] .+(?:\n[-*] .+)*)/g,
+    block=>{
+      const lines = block.trim().split("\n");
+      return "<ul>"+lines.map(x=>"<li>"+x.slice(2)+"</li>").join("")+"</ul>";
     }
   );
 
-  /*
-   * Ordered lists
-   */
+  safe = safe.replace(/\n\n+/g,"</p><p>");
+  safe = safe.replace(/\n/g,"<br>");
+
+  safe = "<p>"+safe+"</p>";
+
   safe = safe.replace(
-    /(^|\n)((?:[ \t]*\d+[.)] .+(?:\n|$))+)/g,
-    (_, prefix, block) => {
-      const items = block
-        .trim()
-        .split("\n")
-        .map(line => line.replace(/^[ \t]*\d+[.)] /, "").trim())
-        .filter(Boolean);
-
-      if (!items.length) return prefix;
-
-      return (
-        prefix +
-        "<ol>" +
-        items.map(item => `<li>${item}</li>`).join("") +
-        "</ol>"
-      );
-    }
-  );
-
-  /*
-   * Paragraphs / line breaks
-   */
-  safe = safe
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\n/g, "<br>");
-
-  safe = "<p>" + safe + "</p>";
-
-  /*
-   * Restore code blocks.
-   */
-  safe = safe.replace(
-    /@@CODE_BLOCK_(\d+)@@/g,
-    (_, id) => {
+    /@@CODE(\d+)@@/g,
+    (_,id)=>{
       const block = codeBlocks[Number(id)];
-
-      if (!block) return "";
-
-      const codeHTML = escapeHTML(block.code);
-      const language = escapeHTML(block.language);
 
       return `
         <div class="code-wrap">
           <div class="code-head">
-            <span class="code-language">${language}</span>
-
+            <span>${escapeHTML(block.lang)}</span>
             <button
               class="code-copy"
-              type="button"
-              aria-label="Copy code"
+              data-code="${escapeHTML(block.code)}"
             >Copy</button>
           </div>
-
-          <pre><code class="language-${language}">${codeHTML}</code></pre>
+          <pre>${block.code}</pre>
         </div>
       `;
     }
   );
-
-  /*
-   * Remove empty paragraphs created around code blocks.
-   */
-  safe = safe
-    .replace(/<p>\s*<\/p>/g, "")
-    .replace(/<p>\s*(<div class="code-wrap">)/g, "$1")
-    .replace(/(<\/div>)\s*<\/p>/g, "$1");
 
   return safe;
 }
