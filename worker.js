@@ -869,24 +869,22 @@ async function getCurrentUser(request, env) {
  */
 
 async function getChats(request, env) {
-  if (!env.DB) {
-    return jsonResponse(
-      {
-        error: "D1 database is not configured."
-      },
-      500
-    );
-  }
+  try {
+    if (!env.DB) {
+      console.error("D1 database is not configured.");
 
-  const user =
-    await authenticate(
-      request,
-      env.DB
-    );
+      return jsonResponse(
+        {
+          error: "D1 database is not configured.",
+          chats: []
+        },
+        500
+      );
+    }
 
+    const user = await authenticate(request, env.DB);
 
-  const row =
-    await env.DB.prepare(`
+    const row = await env.DB.prepare(`
       SELECT chats_json
       FROM user_chats
       WHERE user_id = ?
@@ -894,28 +892,45 @@ async function getChats(request, env) {
       .bind(user.id)
       .first();
 
+    let chats = [];
 
-  let chats = [];
+    if (row && row.chats_json) {
+      try {
+        const parsed = JSON.parse(row.chats_json);
 
-
-  if (row?.chats_json) {
-    try {
-      chats =
-        JSON.parse(
-          row.chats_json
-        );
-    } catch {
-      chats = [];
+        if (Array.isArray(parsed)) {
+          chats = parsed;
+        }
+      } catch (error) {
+        console.error("Invalid chats_json:", error);
+        chats = [];
+      }
     }
+
+    return jsonResponse({
+      chats
+    });
+
+  } catch (error) {
+    console.error("getChats error:", error);
+
+    if (error instanceof Response) {
+      return new Response(error.body, {
+        status: error.status,
+        headers: corsHeaders
+      });
+    }
+
+    return jsonResponse(
+      {
+        error:
+          error?.message ||
+          "Unable to load chat history.",
+        chats: []
+      },
+      500
+    );
   }
-
-
-  return jsonResponse({
-    chats:
-      Array.isArray(chats)
-        ? chats
-        : []
-  });
 }
 
 
