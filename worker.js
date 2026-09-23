@@ -1,3 +1,87 @@
+async function recordUsage(env, data) {
+  console.log("=== SUPABASE USAGE DEBUG ===");
+
+  console.log(
+    "SUPABASE_URL:",
+    env.SUPABASE_URL ? "SET" : "MISSING"
+  );
+
+  console.log(
+    "SUPABASE_SERVICE_ROLE_KEY:",
+    env.SUPABASE_SERVICE_ROLE_KEY ? "SET" : "MISSING"
+  );
+
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("SUPABASE CONFIG MISSING");
+    return;
+  }
+
+  const url = `${env.SUPABASE_URL}/rest/v1/usage_stats`;
+
+  console.log("SUPABASE REQUEST URL:", url);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": env.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        "Prefer": "return=minimal"
+      },
+
+      body: JSON.stringify({
+        user_id: data.user_id || null,
+        action: data.action || "chat_request",
+        model: data.model || null,
+        status: data.status || null
+      })
+    });
+
+    console.log(
+      "SUPABASE HTTP STATUS:",
+      response.status
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      console.error(
+        "SUPABASE INSERT FAILED:",
+        errorText
+      );
+
+      return;
+    }
+
+    console.log(
+      "SUPABASE INSERT SUCCESS"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "SUPABASE FETCH FAILED"
+    );
+
+    console.error(
+      "ERROR NAME:",
+      error?.name
+    );
+
+    console.error(
+      "ERROR MESSAGE:",
+      error?.message
+    );
+
+    console.error(
+      "ERROR:",
+      error
+    );
+  }
+}
+
 const GEMINI_MODEL = "gemini-3.6-flash";
 
 const GEMINI_API_URL =
