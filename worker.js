@@ -11,33 +11,60 @@ async function recordUsage(env, data) {
     env.SUPABASE_SERVICE_ROLE_KEY ? "SET" : "MISSING"
   );
 
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("SUPABASE CONFIG MISSING");
-    return;
+  if (
+    !env.SUPABASE_URL ||
+    !env.SUPABASE_SERVICE_ROLE_KEY
+  ) {
+    console.error(
+      "SUPABASE CONFIG MISSING"
+    );
+    return false;
   }
 
-  const url = `${env.SUPABASE_URL}/rest/v1/usage_stats`;
+  const url =
+    `${env.SUPABASE_URL}/rest/v1/usage_stats`;
 
-  console.log("SUPABASE REQUEST URL:", url);
+  console.log(
+    "SUPABASE REQUEST URL:",
+    url
+  );
 
   try {
-    const response = await fetch(url, {
-      method: "POST",
+    const response = await fetch(
+      url,
+      {
+        method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": env.SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        "Prefer": "return=minimal"
-      },
+        headers: {
+          "Content-Type":
+            "application/json",
 
-      body: JSON.stringify({
-        user_id: data.user_id || null,
-        action: data.action || "chat_request",
-        model: data.model || null,
-        status: data.status || null
-      })
-    });
+          "apikey":
+            env.SUPABASE_SERVICE_ROLE_KEY,
+
+          "Authorization":
+            `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+
+          "Prefer":
+            "return=minimal"
+        },
+
+        body: JSON.stringify({
+          user_id:
+            data.user_id || null,
+
+          action:
+            data.action ||
+            "chat_request",
+
+          model:
+            data.model || null,
+
+          status:
+            data.status || null
+        })
+      }
+    );
 
     console.log(
       "SUPABASE HTTP STATUS:",
@@ -45,19 +72,22 @@ async function recordUsage(env, data) {
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorText =
+        await response.text();
 
       console.error(
         "SUPABASE INSERT FAILED:",
         errorText
       );
 
-      return;
+      return false;
     }
 
     console.log(
       "SUPABASE INSERT SUCCESS"
     );
+
+    return true;
 
   } catch (error) {
 
@@ -79,11 +109,15 @@ async function recordUsage(env, data) {
       "ERROR:",
       error
     );
+
+    return false;
   }
 }
 
 
-const GEMINI_MODEL = "gemini-3.6-flash";
+const GEMINI_MODEL =
+  "gemini-3.6-flash";
+
 
 const GEMINI_API_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -91,9 +125,15 @@ const GEMINI_API_URL =
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Content-Type": "application/json"
+
+  "Access-Control-Allow-Methods":
+    "GET, POST, PUT, OPTIONS",
+
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization",
+
+  "Content-Type":
+    "application/json"
 };
 
 
@@ -335,7 +375,8 @@ const worker_default = {
       });
     }
 
-    const url = new URL(request.url);
+    const url =
+      new URL(request.url);
 
     try {
 
@@ -343,20 +384,20 @@ const worker_default = {
        * ========================================================
        * AI CHAT
        * ========================================================
-       *
-       * Supports:
-       * POST /
-       * POST /chat
-       * POST /chats
        */
 
       if (
-        (url.pathname === "/" ||
+        (
+          url.pathname === "/" ||
           url.pathname === "/chat" ||
-          url.pathname === "/chats") &&
+          url.pathname === "/chats"
+        ) &&
         request.method === "POST"
       ) {
-        return await chat(request, env);
+        return await chat(
+          request,
+          env
+        );
       }
 
 
@@ -367,24 +408,36 @@ const worker_default = {
        */
 
       if (
-        url.pathname === "/auth/signup" &&
+        url.pathname ===
+          "/auth/signup" &&
         request.method === "POST"
       ) {
-        return await signup(request, env);
+        return await signup(
+          request,
+          env
+        );
       }
 
       if (
-        url.pathname === "/auth/login" &&
+        url.pathname ===
+          "/auth/login" &&
         request.method === "POST"
       ) {
-        return await login(request, env);
+        return await login(
+          request,
+          env
+        );
       }
 
       if (
-        url.pathname === "/auth/me" &&
+        url.pathname ===
+          "/auth/me" &&
         request.method === "GET"
       ) {
-        return await getCurrentUser(request, env);
+        return await getCurrentUser(
+          request,
+          env
+        );
       }
 
 
@@ -398,20 +451,27 @@ const worker_default = {
         url.pathname === "/chats" &&
         request.method === "GET"
       ) {
-        return await getChats(request, env);
+        return await getChats(
+          request,
+          env
+        );
       }
 
       if (
         url.pathname === "/chats" &&
         request.method === "PUT"
       ) {
-        return await saveChats(request, env);
+        return await saveChats(
+          request,
+          env
+        );
       }
 
 
       return jsonResponse(
         {
-          error: "Not found."
+          error:
+            "Not found."
         },
         404
       );
@@ -423,12 +483,17 @@ const worker_default = {
         error
       );
 
-      if (error instanceof Response) {
+      if (
+        error instanceof Response
+      ) {
         return new Response(
           error.body,
           {
-            status: error.status,
-            headers: corsHeaders
+            status:
+              error.status,
+
+            headers:
+              corsHeaders
           }
         );
       }
@@ -452,7 +517,10 @@ const worker_default = {
  * ============================================================
  */
 
-async function chat(request, env) {
+async function chat(
+  request,
+  env
+) {
 
   /*
    * ------------------------------------------------------------
@@ -478,7 +546,6 @@ async function chat(request, env) {
       "Chat authentication error:",
       error
     );
-
   }
 
 
@@ -512,6 +579,13 @@ async function chat(request, env) {
   const messages =
     body.messages;
 
+  const attachments =
+    Array.isArray(
+      body.attachments
+    )
+      ? body.attachments
+      : [];
+
 
   if (
     !Array.isArray(messages) ||
@@ -535,13 +609,16 @@ async function chat(request, env) {
    */
 
   const lastMessage =
-    messages[messages.length - 1];
+    messages[
+      messages.length - 1
+    ];
 
 
   if (
     lastMessage &&
     lastMessage.role === "user" &&
-    typeof lastMessage.content === "string"
+    typeof lastMessage.content ===
+      "string"
   ) {
 
     const userText =
@@ -564,7 +641,6 @@ async function chat(request, env) {
         reply:
           "I am Milky Way."
       });
-
     }
 
 
@@ -584,7 +660,6 @@ async function chat(request, env) {
         reply:
           "No. I am Milky Way."
       });
-
     }
 
 
@@ -592,10 +667,6 @@ async function chat(request, env) {
      * ----------------------------------------------------------
      * CREATOR CODE WORD
      * ----------------------------------------------------------
-     *
-     * IMPORTANT:
-     * This is a conversational trigger,
-     * NOT secure authentication.
      */
 
     const CREATOR_CODE_WORD =
@@ -619,10 +690,6 @@ async function chat(request, env) {
         );
 
 
-    /*
-     * Code word can appear BEFORE or AFTER the question.
-     */
-
     if (creatorQuestion) {
 
       if (hasCodeWord) {
@@ -634,7 +701,6 @@ async function chat(request, env) {
             `with the goal of making human life easier, smoother, ` +
             `more comfortable, and faster.`
         });
-
       }
 
 
@@ -648,7 +714,6 @@ async function chat(request, env) {
           "through learning, experimentation, curiosity, and a " +
           "passion for creating something genuinely useful."
       });
-
     }
 
 
@@ -671,7 +736,6 @@ async function chat(request, env) {
           "Creator-level access must be verified through the " +
           "application's authorized authentication system."
       });
-
     }
   }
 
@@ -687,7 +751,8 @@ async function chat(request, env) {
       .filter(
         (message) =>
           message &&
-          typeof message.content === "string" &&
+          typeof message.content ===
+            "string" &&
           (
             message.role === "user" ||
             message.role === "assistant"
@@ -710,7 +775,89 @@ async function chat(request, env) {
       );
 
 
-  if (contents.length === 0) {
+  /*
+   * ------------------------------------------------------------
+   * ADD UPLOADED FILES
+   * ------------------------------------------------------------
+   */
+
+  if (
+    attachments.length > 0 &&
+    contents.length > 0
+  ) {
+
+    const lastContent =
+      contents[
+        contents.length - 1
+      ];
+
+    if (
+      lastContent.role === "user"
+    ) {
+
+      for (
+        const file of attachments
+      ) {
+
+        if (
+          !file ||
+          typeof file.mimeType !==
+            "string"
+        ) {
+          continue;
+        }
+
+
+        /*
+         * Text / code / JSON / CSV
+         */
+
+        if (
+          file.type === "text" &&
+          typeof file.content ===
+            "string"
+        ) {
+
+          lastContent.parts.push({
+            text:
+              `\n\n--- Attached file: ${file.name} ---\n` +
+              file.content +
+              `\n--- End attached file ---`
+          });
+
+          continue;
+        }
+
+
+        /*
+         * Images / PDFs
+         */
+
+        if (
+          file.type ===
+            "inline_data" &&
+          typeof file.data ===
+            "string"
+        ) {
+
+          lastContent.parts.push({
+            inline_data: {
+              mime_type:
+                file.mimeType,
+
+              data:
+                file.data
+            }
+          });
+        }
+      }
+    }
+  }
+
+
+  if (
+    contents.length === 0
+  ) {
 
     return jsonResponse(
       {
@@ -756,8 +903,11 @@ async function chat(request, env) {
             contents,
 
             generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 2048
+              temperature:
+                0.7,
+
+              maxOutputTokens:
+                2048
             }
           })
       }
@@ -774,7 +924,9 @@ async function chat(request, env) {
    * ------------------------------------------------------------
    */
 
-  if (!geminiResponse.ok) {
+  if (
+    !geminiResponse.ok
+  ) {
 
     console.error(
       "Gemini API Error:",
@@ -782,15 +934,12 @@ async function chat(request, env) {
     );
 
 
-    /*
-     * Record failed request
-     */
-
     await recordUsage(
       env,
       {
         user_id:
-          authUser?.id || null,
+          authUser?.id ||
+          null,
 
         action:
           "chat_request",
@@ -839,14 +988,14 @@ async function chat(request, env) {
       candidate.content.parts
         .filter(
           (part) =>
-            typeof part.text === "string"
+            typeof part.text ===
+              "string"
         )
         .map(
           (part) =>
             part.text
         )
         .join("");
-
   }
 
 
@@ -856,7 +1005,9 @@ async function chat(request, env) {
    * ------------------------------------------------------------
    */
 
-  if (!reply.trim()) {
+  if (
+    !reply.trim()
+  ) {
 
     console.error(
       "Unexpected Gemini response:",
@@ -868,7 +1019,8 @@ async function chat(request, env) {
       env,
       {
         user_id:
-          authUser?.id || null,
+          authUser?.id ||
+          null,
 
         action:
           "chat_request",
@@ -902,7 +1054,8 @@ async function chat(request, env) {
     env,
     {
       user_id:
-        authUser?.id || null,
+        authUser?.id ||
+        null,
 
       action:
         "chat_request",
@@ -935,7 +1088,10 @@ async function chat(request, env) {
  * ============================================================
  */
 
-async function signup(request, env) {
+async function signup(
+  request,
+  env
+) {
 
   if (!env.DB) {
 
@@ -1044,7 +1200,10 @@ async function signup(request, env) {
  * ============================================================
  */
 
-async function login(request, env) {
+async function login(
+  request,
+  env
+) {
 
   if (!env.DB) {
 
