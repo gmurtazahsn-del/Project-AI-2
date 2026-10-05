@@ -15,9 +15,7 @@ async function recordUsage(env, data) {
     !env.SUPABASE_URL ||
     !env.SUPABASE_SERVICE_ROLE_KEY
   ) {
-    console.error(
-      "SUPABASE CONFIG MISSING"
-    );
+    console.error("SUPABASE CONFIG MISSING");
     return false;
   }
 
@@ -36,8 +34,7 @@ async function recordUsage(env, data) {
         method: "POST",
 
         headers: {
-          "Content-Type":
-            "application/json",
+          "Content-Type": "application/json",
 
           "apikey":
             env.SUPABASE_SERVICE_ROLE_KEY,
@@ -51,17 +48,17 @@ async function recordUsage(env, data) {
 
         body: JSON.stringify({
           user_id:
-            data.user_id || null,
+            data.user_id ?? null,
 
           action:
-            data.action ||
+            data.action ??
             "chat_request",
 
           model:
-            data.model || null,
+            data.model ?? null,
 
           status:
-            data.status || null
+            data.status ?? null
         })
       }
     );
@@ -90,7 +87,6 @@ async function recordUsage(env, data) {
     return true;
 
   } catch (error) {
-
     console.error(
       "SUPABASE FETCH FAILED"
     );
@@ -119,16 +115,9 @@ async function recordUsage(env, data) {
  * ============================================================
  * RECORD CHAT IN SUPABASE
  * ============================================================
- *
- * Stores the actual user message and AI reply.
- *
- * This is separate from usage_stats.
- *
- * ============================================================
  */
 
 async function recordChat(env, data) {
-
   console.log("=== SUPABASE CHAT DEBUG ===");
 
   console.log(
@@ -143,12 +132,10 @@ async function recordChat(env, data) {
       : "MISSING"
   );
 
-
   if (
     !env.SUPABASE_URL ||
     !env.SUPABASE_SERVICE_ROLE_KEY
   ) {
-
     console.error(
       "SUPABASE CHAT CONFIG MISSING"
     );
@@ -156,18 +143,49 @@ async function recordChat(env, data) {
     return false;
   }
 
-
   const url =
     `${env.SUPABASE_URL}/rest/v1/chat_messages`;
-
 
   console.log(
     "SUPABASE CHAT REQUEST URL:",
     url
   );
 
-
   try {
+    const payload = {
+      user_id:
+        data.user_id ?? null,
+
+      chat_id:
+        data.chat_id ?? null,
+
+      user_message:
+        typeof data.user_message === "string"
+          ? data.user_message
+          : "",
+
+      ai_reply:
+        typeof data.ai_reply === "string"
+          ? data.ai_reply
+          : ""
+    };
+
+    console.log(
+      "SUPABASE CHAT PAYLOAD:",
+      {
+        user_id:
+          payload.user_id,
+
+        chat_id:
+          payload.chat_id,
+
+        user_message_length:
+          payload.user_message.length,
+
+        ai_reply_length:
+          payload.ai_reply.length
+      }
+    );
 
     const response =
       await fetch(
@@ -190,58 +208,34 @@ async function recordChat(env, data) {
           },
 
           body:
-            JSON.stringify({
-              user_id:
-                data.user_id ||
-                null,
-
-              chat_id:
-                data.chat_id ||
-                null,
-
-              user_message:
-                data.user_message ||
-                "",
-
-              ai_reply:
-                data.ai_reply ||
-                ""
-            })
+            JSON.stringify(payload)
         }
       );
-
 
     console.log(
       "SUPABASE CHAT HTTP STATUS:",
       response.status
     );
 
-
     if (!response.ok) {
-
       const errorText =
         await response.text();
-
 
       console.error(
         "SUPABASE CHAT INSERT FAILED:",
         errorText
       );
 
-
       return false;
     }
-
 
     console.log(
       "SUPABASE CHAT INSERT SUCCESS"
     );
 
-
     return true;
 
   } catch (error) {
-
     console.error(
       "SUPABASE CHAT FETCH FAILED"
     );
@@ -523,7 +517,6 @@ const worker_default = {
     if (
       request.method === "OPTIONS"
     ) {
-
       return new Response(
         null,
         {
@@ -533,10 +526,8 @@ const worker_default = {
       );
     }
 
-
     const url =
       new URL(request.url);
-
 
     try {
 
@@ -554,7 +545,6 @@ const worker_default = {
         ) &&
         request.method === "POST"
       ) {
-
         return await chat(
           request,
           env
@@ -573,7 +563,6 @@ const worker_default = {
           "/auth/signup" &&
         request.method === "POST"
       ) {
-
         return await signup(
           request,
           env
@@ -586,7 +575,6 @@ const worker_default = {
           "/auth/login" &&
         request.method === "POST"
       ) {
-
         return await login(
           request,
           env
@@ -599,7 +587,6 @@ const worker_default = {
           "/auth/me" &&
         request.method === "GET"
       ) {
-
         return await getCurrentUser(
           request,
           env
@@ -617,7 +604,6 @@ const worker_default = {
         url.pathname === "/chats" &&
         request.method === "GET"
       ) {
-
         return await getChats(
           request,
           env
@@ -629,7 +615,6 @@ const worker_default = {
         url.pathname === "/chats" &&
         request.method === "PUT"
       ) {
-
         return await saveChats(
           request,
           env
@@ -652,11 +637,9 @@ const worker_default = {
         error
       );
 
-
       if (
         error instanceof Response
       ) {
-
         return new Response(
           error.body,
           {
@@ -668,7 +651,6 @@ const worker_default = {
           }
         );
       }
-
 
       return jsonResponse(
         {
@@ -694,19 +676,11 @@ async function chat(
   env
 ) {
 
-  /*
-   * ------------------------------------------------------------
-   * AUTHENTICATE USER FOR USAGE TRACKING
-   * ------------------------------------------------------------
-   */
-
   let authUser = null;
-
 
   try {
 
     if (env.DB) {
-
       authUser =
         await authenticate(
           request,
@@ -723,16 +697,9 @@ async function chat(
   }
 
 
-  /*
-   * ------------------------------------------------------------
-   * GEMINI CONFIGURATION
-   * ------------------------------------------------------------
-   */
-
   if (
     !env.GEMINI_API_KEY
   ) {
-
     return jsonResponse(
       {
         error:
@@ -742,12 +709,6 @@ async function chat(
     );
   }
 
-
-  /*
-   * ------------------------------------------------------------
-   * READ REQUEST BODY
-   * ------------------------------------------------------------
-   */
 
   const body =
     await request.json();
@@ -765,18 +726,6 @@ async function chat(
       : [];
 
 
-  /*
-   * CHAT ID
-   *
-   * Your frontend can send:
-   *
-   * {
-   *   chat_id: "some-chat-id"
-   * }
-   *
-   * If it does not send one, Supabase will store NULL.
-   */
-
   const chatId =
     body.chat_id
       ? String(body.chat_id)
@@ -787,7 +736,6 @@ async function chat(
     !Array.isArray(messages) ||
     messages.length === 0
   ) {
-
     return jsonResponse(
       {
         error:
@@ -797,12 +745,6 @@ async function chat(
     );
   }
 
-
-  /*
-   * ------------------------------------------------------------
-   * MILKY WAY IDENTITY PROTECTION
-   * ------------------------------------------------------------
-   */
 
   const lastMessage =
     messages[
@@ -821,18 +763,11 @@ async function chat(
       lastMessage.content.trim();
 
 
-    /*
-     * ----------------------------------------------------------
-     * MILKY WAY IDENTITY
-     * ----------------------------------------------------------
-     */
-
     if (
       /^(what('?s| is) your name|who are you|what are you called|tell me your name|what should i call you)\??$/i.test(
         userText
       )
     ) {
-
       return jsonResponse({
         reply:
           "I am Milky Way."
@@ -840,30 +775,17 @@ async function chat(
     }
 
 
-    /*
-     * ----------------------------------------------------------
-     * NOVA PROTECTION
-     * ----------------------------------------------------------
-     */
-
     if (
       /^(are you nova|are you nova ai|is your name nova|is your name nova ai)\??$/i.test(
         userText
       )
     ) {
-
       return jsonResponse({
         reply:
           "No. I am Milky Way."
       });
     }
 
-
-    /*
-     * ----------------------------------------------------------
-     * CREATOR CODE WORD
-     * ----------------------------------------------------------
-     */
 
     const CREATOR_CODE_WORD =
       "CoSmIc-BaNg-MiLkY-wAy=AI";
@@ -894,7 +816,6 @@ async function chat(
       if (
         hasCodeWord
       ) {
-
         return jsonResponse({
           reply:
             `I was created by ${CREATOR_NAME}. ` +
@@ -918,18 +839,11 @@ async function chat(
     }
 
 
-    /*
-     * ----------------------------------------------------------
-     * CREATOR IMPERSONATION PROTECTION
-     * ----------------------------------------------------------
-     */
-
     if (
       /i am your creator|i'm your creator|i am the creator|i'm the creator|i created you|i made you|i built you|i am your developer|i'm your developer|i am the developer|i'm the developer/i.test(
         userText
       )
     ) {
-
       return jsonResponse({
         reply:
           "You can tell me that you're my creator, but I can't " +
@@ -940,12 +854,6 @@ async function chat(
     }
   }
 
-
-  /*
-   * ------------------------------------------------------------
-   * CONVERT CHAT HISTORY TO GEMINI FORMAT
-   * ------------------------------------------------------------
-   */
 
   const contents =
     messages
@@ -976,12 +884,6 @@ async function chat(
       );
 
 
-  /*
-   * ------------------------------------------------------------
-   * ADD UPLOADED FILES
-   * ------------------------------------------------------------
-   */
-
   if (
     attachments.length > 0 &&
     contents.length > 0
@@ -1010,10 +912,6 @@ async function chat(
         }
 
 
-        /*
-         * Text / code / JSON / CSV
-         */
-
         if (
           file.type === "text" &&
           typeof file.content ===
@@ -1030,10 +928,6 @@ async function chat(
           continue;
         }
 
-
-        /*
-         * Images / PDFs
-         */
 
         if (
           file.type ===
@@ -1060,7 +954,6 @@ async function chat(
   if (
     contents.length === 0
   ) {
-
     return jsonResponse(
       {
         error:
@@ -1070,12 +963,6 @@ async function chat(
     );
   }
 
-
-  /*
-   * ------------------------------------------------------------
-   * GEMINI REQUEST
-   * ------------------------------------------------------------
-   */
 
   const geminiResponse =
     await fetch(
@@ -1120,12 +1007,6 @@ async function chat(
     await geminiResponse.json();
 
 
-  /*
-   * ------------------------------------------------------------
-   * GEMINI ERROR
-   * ------------------------------------------------------------
-   */
-
   if (
     !geminiResponse.ok
   ) {
@@ -1166,12 +1047,6 @@ async function chat(
   }
 
 
-  /*
-   * ------------------------------------------------------------
-   * EXTRACT RESPONSE
-   * ------------------------------------------------------------
-   */
-
   let reply = "";
 
 
@@ -1200,12 +1075,6 @@ async function chat(
         .join("");
   }
 
-
-  /*
-   * ------------------------------------------------------------
-   * EMPTY RESPONSE
-   * ------------------------------------------------------------
-   */
 
   if (
     !reply.trim()
@@ -1246,21 +1115,9 @@ async function chat(
   }
 
 
-  /*
-   * ------------------------------------------------------------
-   * FINAL AI REPLY
-   * ------------------------------------------------------------
-   */
-
   const finalReply =
     reply.trim();
 
-
-  /*
-   * ------------------------------------------------------------
-   * RECORD SUCCESSFUL USAGE
-   * ------------------------------------------------------------
-   */
 
   await recordUsage(
     env,
@@ -1282,45 +1139,39 @@ async function chat(
 
 
   /*
-   * ------------------------------------------------------------
-   * SAVE USER MESSAGE + AI REPLY TO SUPABASE
-   * ------------------------------------------------------------
-   *
-   * This happens after Gemini successfully responds.
-   *
-   * The latest user message is saved together with
-   * the AI response that belongs to it.
-   *
-   * ------------------------------------------------------------
+   * ==========================================================
+   * SAVE MESSAGE + REPLY
+   * ==========================================================
    */
 
-  await recordChat(
-    env,
-    {
-      user_id:
-        authUser?.id ||
-        null,
+  const chatSaved =
+    await recordChat(
+      env,
+      {
+        user_id:
+          authUser?.id ||
+          null,
 
-      chat_id:
-        chatId,
+        chat_id:
+          chatId,
 
-      user_message:
-        typeof lastMessage?.content ===
-          "string"
-          ? lastMessage.content
-          : "",
+        user_message:
+          typeof lastMessage?.content ===
+            "string"
+            ? lastMessage.content
+            : "",
 
-      ai_reply:
-        finalReply
-    }
+        ai_reply:
+          finalReply
+      }
+    );
+
+
+  console.log(
+    "CHAT DATABASE SAVE RESULT:",
+    chatSaved
   );
 
-
-  /*
-   * ------------------------------------------------------------
-   * RETURN AI RESPONSE
-   * ------------------------------------------------------------
-   */
 
   return jsonResponse({
     reply:
@@ -1341,7 +1192,6 @@ async function signup(
 ) {
 
   if (!env.DB) {
-
     return jsonResponse(
       {
         error:
@@ -1386,7 +1236,6 @@ async function signup(
 
 
   if (existing) {
-
     return jsonResponse(
       {
         error:
@@ -1453,7 +1302,6 @@ async function login(
 ) {
 
   if (!env.DB) {
-
     return jsonResponse(
       {
         error:
@@ -1503,7 +1351,6 @@ async function login(
 
 
   if (!user) {
-
     return jsonResponse(
       {
         error:
@@ -1522,7 +1369,6 @@ async function login(
 
 
   if (!valid) {
-
     return jsonResponse(
       {
         error:
@@ -1561,7 +1407,6 @@ async function getCurrentUser(
 ) {
 
   if (!env.DB) {
-
     return jsonResponse(
       {
         error:
@@ -1655,7 +1500,6 @@ async function getChats(
         if (
           Array.isArray(parsed)
         ) {
-
           chats = parsed;
         }
 
