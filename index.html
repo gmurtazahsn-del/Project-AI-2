@@ -595,8 +595,27 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   margin:0;
   padding:15px;
   overflow:auto;
+  background:transparent;
   font:12px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;
   color:#dfe6f5;
+}
+
+/* Keep the actual code area the exact same background as the code box. */
+.code-wrap pre code{
+  display:block;
+  margin:0;
+  padding:0;
+  background:transparent;
+  border:0;
+  border-radius:0;
+  font:inherit;
+  color:inherit;
+}
+
+/* Use the Milky Way selection color instead of the browser's bright blue. */
+.code-wrap ::selection{
+  background:rgba(130,119,255,.22);
+  color:inherit;
 }
 
 .msg-actions{
@@ -1608,9 +1627,19 @@ function createMessageElement(message,index){
     });
 
   wrapper.querySelectorAll(".code-copy").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      navigator.clipboard?.writeText(btn.dataset.code || "");
-      toast("Code copied");
+    btn.addEventListener("click",async ()=>{
+      const code = btn
+        .closest(".code-wrap")
+        ?.querySelector("code")
+        ?.textContent || "";
+
+      try{
+        await navigator.clipboard.writeText(code);
+        btn.textContent = "Copied";
+        setTimeout(()=>btn.textContent = "Copy",1200);
+      }catch{
+        toast("Could not copy code");
+      }
     });
   });
 
@@ -1622,60 +1651,93 @@ function createMessageElement(message,index){
 ========================================================= */
 
 function renderMarkdown(text=""){
-  let safe = escapeHTML(text);
+  /*
+   * Render normal Markdown while keeping fenced code blocks
+   * completely separate from the normal text parser.
+   *
+   * Example:
+   * ```js
+   * console.log("Hello");
+   * ```
+   *
+   * becomes a real .code-wrap / <pre><code> block.
+   */
 
   const codeBlocks = [];
 
+  let safe = escapeHTML(String(text));
+
+  // Capture fenced code blocks BEFORE processing normal Markdown.
   safe = safe.replace(
-    /```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g,
-    (_,lang,code)=>{
+    /```([a-zA-Z0-9_+#.-]*)[ \t]*\r?\n?([\s\S]*?)```/g,
+    (_, lang, code) => {
       const id = codeBlocks.length;
 
+      // Remove only the extra newline directly after the opening fence.
+      if (code.startsWith("\r\n")) code = code.slice(2);
+      else if (code.startsWith("\n")) code = code.slice(1);
+
+      // Keep code formatting exactly as returned by the AI.
       codeBlocks.push({
-        lang:lang || "code",
+        lang: lang || "code",
         code
       });
 
-      return `@@CODE${id}@@`;
+      return `@@CODEBLOCK_${id}@@`;
     }
   );
 
+  // Inline Markdown.
   safe = safe.replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>");
   safe = safe.replace(/\*(.+?)\*/g,"<em>$1</em>");
   safe = safe.replace(/`([^`\n]+)`/g,"<code>$1</code>");
 
+  // Headings.
   safe = safe.replace(/^### (.+)$/gm,"<h3>$1</h3>");
   safe = safe.replace(/^## (.+)$/gm,"<h2>$1</h2>");
   safe = safe.replace(/^# (.+)$/gm,"<h1>$1</h1>");
 
+  // Bullet lists.
   safe = safe.replace(
     /(?:^|\n)([-*] .+(?:\n[-*] .+)*)/g,
-    block=>{
+    block => {
       const lines = block.trim().split("\n");
-      return "<ul>"+lines.map(x=>"<li>"+x.slice(2)+"</li>").join("")+"</ul>";
+
+      return "<ul>" +
+        lines
+          .map(line => `<li>${line.slice(2)}</li>`)
+          .join("") +
+        "</ul>";
     }
   );
 
+  // Paragraphs / line breaks.
   safe = safe.replace(/\n\n+/g,"</p><p>");
   safe = safe.replace(/\n/g,"<br>");
 
-  safe = "<p>"+safe+"</p>";
+  safe = "<p>" + safe + "</p>";
 
+  // Replace placeholders with real code boxes.
   safe = safe.replace(
-    /@@CODE(\d+)@@/g,
-    (_,id)=>{
+    /@@CODEBLOCK_(\d+)@@/g,
+    (_, id) => {
       const block = codeBlocks[Number(id)];
 
+      if (!block) return "";
+
+      const codeId = `code-${Date.now()}-${id}`;
+
       return `
-        <div class="code-wrap">
+        <div class="code-wrap" data-code-id="${codeId}">
           <div class="code-head">
             <span>${escapeHTML(block.lang)}</span>
             <button
+              type="button"
               class="code-copy"
-              data-code="${escapeHTML(block.code)}"
+              aria-label="Copy code"
             >Copy</button>
           </div>
-          <pre>${block.code}</pre>
+          <pre><code>${block.code}</code></pre>
         </div>
       `;
     }
@@ -1688,28 +1750,81 @@ function renderMarkdown(text=""){
    API
 ========================================================= */
 
-async function sendMessage(){
-  const input = document.getElementById("prompt");
-  const text = input.value.trim();
+async function fileToAttachment(file){
+  const maxBytes = 10 * 1024 * 1024;
+  if(file.size > maxBytes) throw new Error(`"${file.name}" is larger than 10 MB.`);
 
-  if(!text || isGenerating) return;
+  const type = file.type || "application/octet-stream";
+  const textTypes = ["text/plain","text/markdown","text/html","text/css","text/javascript","application/javascript","application/json","text/csv","text/xml","application/xml"];
+  const textExtensions = /\.(txt|md|markdown|html?|css|js|mjs|cjs|ts|tsx|jsx|json|csv|xml|svg|py|java|c|cpp|h|hpp|sql|php|rb|go|rs|swift|sh|bat)$/i;
+
+  if(textTypes.includes(type) || textExtensions.test(file.name)){
+    return {name:file.name,type:"text",mimeType:type,content:await file.text()};
+  }
+
+  if(!type.startsWith("image/") && type !== "application/pdf"){
+    throw new Error(`"${file.name}" is not a supported AI attachment. Use an image, PDF, or text/code file.`);
+  }
+
+  const dataUrl = await new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error(`Could not read "${file.name}".`));
+    reader.readAsDataURL(file);
+  });
+  const comma = dataUrl.indexOf(",");
+  if(comma === -1) throw new Error(`Could not prepare "${file.name}".`);
+
+  return {name:file.name,type:"inline_data",mimeType:type,data:dataUrl.slice(comma+1)};
+}
+
+async function sendMessage(options = {}){
+const input = document.getElementById("prompt");
+
+const text = options.text ?? input.value.trim();
+const regeneration = options.regeneration === true;
+const originalAttachments = Array.isArray(options.attachments)
+  ? options.attachments
+  : null;
+
+if((!text && !selectedFiles.length && !originalAttachments?.length) || isGenerating) return;
 
   if(!state.currentChatId){
     createChat();
   }
 
-  selectedFiles.forEach(file=>{
-    text;
-  });
+let attachments = Array.isArray(originalAttachments)
+  ? originalAttachments
+  : null;
 
-  messages.push({
-    role:"user",
-    content:text
-  });
+  if(!attachments){
+    try{
+      attachments = await Promise.all(
+      selectedFiles.map(file => fileToAttachment(file))
+      );
+    }catch(error){
+      toast(error.message || "Could not read the attachment.");
+      return;
+    }
+  }
+  const attachmentNames = attachments.map(file=>file.name).join(", ");
+  attachments = Array.isArray(attachments) ? attachments : [];
+  const userContent = text || `Please analyze the attached file${attachments.length > 1 ? "s" : ""}: ${attachmentNames}`;
 
-  input.value="";
+messages.push({
+  role: "user",
+  content: userContent,
+  attachments: attachments
+});
+
+  input.value = "";
+
+  if(!regeneration){
+    selectedFiles = [];
+    renderFilePreview();
+  }
+
   autoResize();
-
   renderMessages();
 
   saveCurrentChat();
@@ -1741,7 +1856,10 @@ async function sendMessage(){
 
   abortController = new AbortController();
 
+  let workerReached = false;
+
   try{
+
     const model = document.getElementById("modelSelect").value;
 
     const response = await fetch(API_BASE + "/chats",{
@@ -1749,11 +1867,17 @@ async function sendMessage(){
       headers:headers(),
       signal:abortController.signal,
       body:JSON.stringify({
-        message:text,
-        messages:messages.slice(0,-1),
-        model
+        message:userContent,
+        messages: regeneration
+          ? messages
+          : messages.slice(0,-1),
+        model,
+        attachments
       })
     });
+
+    workerReached = true;
+    setConnection(true);
 
     const data = await response.json().catch(()=>({}));
 
@@ -1776,18 +1900,26 @@ async function sendMessage(){
 
   }catch(error){
 
-    if(error.name==="AbortError"){
-      messages[typingIndex].content =
-        "Generation stopped.";
-    }else{
+  if(error.name==="AbortError"){
+    messages[typingIndex].content =
+      "Generation stopped.";
+  }else{
+    if(!workerReached){
+      setConnection(false);
+
       messages[typingIndex].content =
         "I couldn't reach the AI server right now.\n\n" +
         "Please check your Worker endpoint and try again.";
+    }else{
+      setConnection(true);
 
-      setConnection(false);
-      toast(error.message || "Connection failed");
+      messages[typingIndex].content =
+        "The AI request failed.\n\n" +
+        (error.message || "The server returned an error.");
     }
 
+  toast(error.message || "Request failed");
+  }
     renderMessages();
     saveCurrentChat();
 
@@ -1802,17 +1934,21 @@ function regenerate(index){
   if(isGenerating) return;
 
   const previousUser = messages
-    .slice(0,index)
+    .slice(0, index)
     .reverse()
-    .find(m=>m.role==="user");
+    .find(message => message.role === "user");
 
   if(!previousUser) return;
 
-  messages = messages.slice(0,index);
+  messages = messages.slice(0, index);
+
   renderMessages();
 
-  document.getElementById("prompt").value = previousUser.content;
-  sendMessage();
+  sendMessage({
+    text: previousUser.content,
+    attachments: previousUser.attachments || [],
+    regeneration: true
+  });
 }
 
 /* =========================================================
